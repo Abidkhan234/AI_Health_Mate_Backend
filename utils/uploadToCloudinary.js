@@ -1,15 +1,17 @@
-import fs from "fs-extra";
 import cloudinary from '../config/cloudinary.js'
 import "dotenv/config"
 
-const uploadFileToCloudinary = async (localFilePath) => {
+const uploadFileToCloudinary = async (buffer) => {
     try {
-
-        if (!localFilePath) {
+        if (!buffer) {
             return;
         }
 
-        const publicFile = await cloudinary.uploader.upload(localFilePath, {
+        // Convert buffer to base64 data URI for PDF
+        const base64String = buffer.toString('base64');
+        const dataURI = `data:application/pdf;base64,${base64String}`;
+
+        const publicFile = await cloudinary.uploader.upload(dataURI, {
             folder: process.env.CLOUDINARY_FOLDER_NAME,
         });
 
@@ -17,15 +19,10 @@ const uploadFileToCloudinary = async (localFilePath) => {
             return;
         }
 
-        fs.removeSync(localFilePath);
-
         return publicFile;
     } catch (error) {
         console.log(error);
-        if (localFilePath) {
-            fs.removeSync(localFilePath);
-        }
-        throw error
+        throw error;
     }
 }
 

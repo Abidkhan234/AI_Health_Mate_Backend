@@ -6,7 +6,7 @@ import upload from '../middlewares/multerMiddleware.js';
 
 const reportRoute = express.Router();
 
-reportRoute.post("/upload-report", protectedRoute, checkDailyLimit, upload.single("file"), addReport);
+reportRoute.post("/upload-report", protectedRoute, upload.single("file"), addReport);
 
 reportRoute.get("/", protectedRoute, getAllReports);
 

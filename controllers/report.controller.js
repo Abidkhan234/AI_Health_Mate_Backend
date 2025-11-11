@@ -2,16 +2,14 @@ import reportModel from '../models/reportModel.js';
 import { decryptText, encryptText } from '../utils/encryptText.js';
 import summarizeMedicalReport from '../utils/generateSummary.js';
 import sendResponse from '../utils/sendResponse.js'
-import extractText from '../utils/textExtracter.js';
+import extractTextFromBuffer from '../utils/textExtracter.js';
 import { removeFileFromCloudinary, uploadFileToCloudinary } from '../utils/uploadToCloudinary.js'
-import fs from 'fs-extra'
 
 const addReport = async (req, res) => {
     try {
+        const pdfBuffer = req.file?.buffer; // file in memory
 
-        const filePath = req.file?.path;
-
-        const { id } = req.user
+        const { id } = req.user;
 
         const reportData = {
             ...req.body,
@@ -19,20 +17,21 @@ const addReport = async (req, res) => {
             file_urls: {}
         };
 
-        if (filePath) {
+        if (pdfBuffer) {
 
             // For extracting text from pdf
-            const { error: extractedTextError, text } = await extractText(filePath);
+            const { error: extractedTextError, text } = await extractTextFromBuffer(pdfBuffer);
 
             if (extractedTextError) {
-                return sendResponse(res, 400, extractedTextError)
+                return sendResponse(res, 400, extractedTextError);
             }
 
             reportData.extracted_text = encryptText(text);
+
             // For extracting text from pdf
 
-            // For pdf urls
-            const publicFileUrls = await uploadFileToCloudinary(filePath);
+            // Upload PDF buffer to cloud (e.g., Cloudinary)
+            const publicFileUrls = await uploadFileToCloudinary(pdfBuffer);
 
             if (!publicFileUrls) {
                 return sendResponse(res, 500, "Cloudinary Error");
@@ -40,35 +39,38 @@ const addReport = async (req, res) => {
 
             reportData.file_urls = {
                 url: publicFileUrls.secure_url,
-                public_id: publicFileUrls.public_id,
-                local_path: filePath
-            }
+                public_id: publicFileUrls.public_id
+            };
             // For pdf urls
 
             // For AI response
-
             const { summary, error: aiError } = await summarizeMedicalReport(text);
 
             if (aiError) {
                 reportData.error = encryptText(aiError);
                 reportData.is_summarized = false;
-                return;
+            } else {
+                reportData.summary = encryptText(summary);
+                reportData.is_summarized = true;
             }
-
-            reportData.summary = encryptText(summary);
-
-            reportData.is_summarized = true;
             // For AI response
         }
 
         await reportModel.create({ ...reportData });
 
-        sendResponse(res, 200, "Medical report uploaded successfully", { summary: decryptText(reportData.summary), error: decryptText(reportData.error), is_summarized: reportData.is_summarized, report_title: req.body.report_title, report_description: req.body.report_description })
+        sendResponse(res, 200, "Medical report uploaded successfully", {
+            summary: decryptText(reportData.summary),
+            error: decryptText(reportData.error),
+            is_summarized: reportData.is_summarized,
+            report_title: req.body.report_title,
+            report_description: req.body.report_description
+        });
+
     } catch (error) {
         console.log("Add Report Error", error);
-        sendResponse(res, 500, "Internal server error", { error: error.message })
+        sendResponse(res, 500, "Internal server error", { error: error.message });
     }
-}
+};
 
 const deleteReport = async (req, res) => {
     try {
@@ -99,7 +101,7 @@ const updateReport = async (req, res) => {
 
         const { id: report_id } = req.params;
 
-        const filePath = req.file?.path;
+        const pdfBuffer = req.file?.buffer;
 
         const today = new Date();
 
@@ -118,8 +120,7 @@ const updateReport = async (req, res) => {
             updatedReportData.is_updated_today = false;
         }
 
-        if (updatedReportData.is_updated_today && filePath) {
-            fs.removeSync(filePath);
+        if (updatedReportData.is_updated_today && pdfBuffer) {
             return sendResponse(
                 res,
                 429,
@@ -128,10 +129,10 @@ const updateReport = async (req, res) => {
         }
 
 
-        if (filePath) {
+        if (pdfBuffer) {
 
             // For extracting text from pdf
-            const { error: extractedTextError, text } = await extractText(filePath);
+            const { error: extractedTextError, text } = await extractTextFromBuffer(pdfBuffer);
 
             if (extractedTextError) {
                 return sendResponse(res, 400, extractedTextError)
@@ -140,12 +141,12 @@ const updateReport = async (req, res) => {
             updatedReportData.extracted_text = encryptText(text);
             // For extracting text from pdf
 
-            if (!reportModel?.file_urls?.public_id) {
-                await removeFileFromCloudinary(reportModel?.file_urls?.public_id);
+            if (exitingReport?.file_urls?.public_id) {
+                await removeFileFromCloudinary(exitingReport?.file_urls?.public_id);
             }
 
             // For pdf urls
-            const publicFileUrls = await uploadFileToCloudinary(filePath);
+            const publicFileUrls = await uploadFileToCloudinary(pdfBuffer);
 
             if (!publicFileUrls) {
                 return sendResponse(res, 500, "Cloudinary Error");
@@ -178,7 +179,7 @@ const updateReport = async (req, res) => {
 
         const updatedReport = await reportModel.findByIdAndUpdate(report_id, { $set: updatedReportData }, { new: true });
 
-        if (filePath) {
+        if (pdfBuffer) {
             return sendResponse(res, 200, "Report updated successfully", { summary: decryptText(updatedReport.summary), error: decryptText(updatedReport.error), is_summarized: updatedReport.is_summarized, report_title: updatedReport.report_title, report_description: updatedReport.report_description })
         }
 

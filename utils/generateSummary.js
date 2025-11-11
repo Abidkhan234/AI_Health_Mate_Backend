@@ -1,12 +1,12 @@
 import genAI from "../config/gemini.js";
 
 const summarizeMedicalReport = async (extractedText) => {
-    try {
-        if (!extractedText || extractedText.trim().length === 0) {
-            throw new Error("No text extracted from the document");
-        }
+  try {
+    if (!extractedText || extractedText.trim().length === 0) {
+      throw new Error("No text extracted from the document");
+    }
 
-        const prompt = `
+    const prompt = `
 You are a professional medical assistant AI that reads and explains medical documents for patients.
 
 Your task:
@@ -53,27 +53,27 @@ ${extractedText}
 `;
 
 
-        const response = genAI.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-        });
+    const response = genAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-        const summary = (await response).text.replace(/\\n/g, " ")   // remove literal '\n'
-            .replace(/\n/g, " ")    // remove real newlines
-            .replace(/\s+/g, " ") // normalize spaces
-            .replaceAll("**", "")
-            .trim();
+    const summary = (await response).text.replace(/\\n/g, " ")   // remove literal '\n'
+      .replace(/\n/g, " ")    // remove real newlines
+      .replace(/\s+/g, " ") // normalize spaces
+      .replaceAll("**", "")
+      .trim();
 
-        return { summary, error: null };
-    } catch (error) {
-        console.error("Error summarizing medical report:", error.message);
-        // Handle known Gemini API errors separately if needed
-        if (error.message.includes("429") || error.message.includes("quota")) {
-            return { summary: null, error: "AI usage limit reached for today" };
-        }
-
-        throw error
+    return { summary, error: null };
+  } catch (error) {
+    console.error("Error summarizing medical report:", error.message);
+    // Handle known Gemini API errors separately if needed
+    if (error.message.includes("429") || error.message.includes("quota")) {
+      return { summary: null, error: "AI usage limit reached for today" };
     }
+
+    throw error
+  }
 }
 
 export default summarizeMedicalReport
