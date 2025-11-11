@@ -2,7 +2,7 @@ import multer from "multer";
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "./public/pdfs");
+        cb(null, "./Public/PDFs");
     },
     filename: (req, file, cb) => {
         const date = Date.now();
